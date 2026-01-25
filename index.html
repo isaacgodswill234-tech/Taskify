@@ -109,7 +109,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
 
         const firebaseConfig = {
             apiKey: "AIzaSyCpjvqewcoUF4YztK0YtmFhrI7e4H1-HOg",
@@ -153,7 +153,9 @@
             const [loading, setLoading] = useState(false);
 
             const submit = async () => {
-                if (!proof) return showToast("Screenshot required", "📷");
+                if (!proof) return showToast("Full screenshot required", "📷");
+                if (isPending || isCompleted) return showToast("Submission already exists", "🚫");
+                
                 setLoading(true);
                 try {
                     const ref = db.ref('submissions').push();
@@ -167,7 +169,7 @@
             const isDisabled = isPending || isCompleted;
 
             return (
-                <div className={`card overflow-hidden ${isDisabled ? 'opacity-40' : ''}`}>
+                <div className={`card overflow-hidden ${isDisabled ? 'opacity-40 border-white/5' : 'border-white/10'}`}>
                     <div onClick={() => !isDisabled && setExpanded(!expanded)} className="p-2.5 flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
                             <div className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-lg">{task.icon || '🎯'}</div>
@@ -196,11 +198,11 @@
                                 {proof ? <img src={proof} className="w-full h-full object-cover" /> : 
                                     <div className="text-center opacity-40">
                                         <div className="text-2xl mb-1">📸</div>
-                                        <div className="text-[7px] font-bold uppercase tracking-widest">Upload Full Screenshot</div>
-                                                                       </div>
-                                    }
+                                                <div className="text-[7px] font-bold uppercase tracking-widest">Upload Full Screenshot</div>
+                                    </div>
+                                }
                             </div>
-                            <button disabled={loading || !proof} onClick={submit} className="btn-fintech">{loading ? 'TRANSMITTING...' : 'SUBMIT PROOF'}</button>
+                            <button disabled={loading || !proof} onClick={submit} className="btn-fintech">{loading ? 'TRANSMITTING...' : 'SUBMIT FULL SCREENSHOT'}</button>
                         </div>
                     )}
                 </div>
@@ -255,7 +257,7 @@
                                     </div>
                                 </div>
                             ))}
-                            {subs.filter(s => s.status === 'pending').length === 0 && <p className="text-center py-10 opacity-20 text-[10px] uppercase">No Signals Pending</p>}
+                            {subs.filter(s => s.status === 'pending').length === 0 && <p className="text-center py-10 opacity-20 text-[10px] uppercase">All signals processed</p>}
                         </div>
                     )}
 
@@ -322,16 +324,16 @@
                             <div className="card p-3 space-y-3">
                                 <h3 className="text-[9px] font-bold text-slate-500 uppercase">Protocol Config</h3>
                                 <div className="space-y-2">
-                                    <label className="text-[8px] font-bold uppercase text-slate-600">Bot Data</label>
+                                    <label className="text-[8px] font-bold uppercase text-slate-600">Bot Settings</label>
                                     <input value={settings.botToken} onChange={e => updateSettings('botToken', e.target.value)} className="input-fintech mb-1" placeholder="Bot API Token" />
                                     <div className="grid grid-cols-2 gap-2">
                                         <input value={settings.botUsername} onChange={e => updateSettings('botUsername', e.target.value)} className="input-fintech" placeholder="Bot Username" />
-                                        <input value={settings.appShortName} onChange={e => updateSettings('appShortName', e.target.value)} className="input-fintech" placeholder="Bot App Shortname" />
+                                        <input value={settings.appShortName} onChange={e => updateSettings('appShortName', e.target.value)} className="input-fintech" placeholder="Bot Shortname (play)" />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[8px] font-bold uppercase text-slate-600">Branding & Channels</label>
-                                    <input value={settings.appName} onChange={e => updateSettings('appName', e.target.value)} className="input-fintech mb-1" placeholder="Display Name" />
+                                    <label className="text-[8px] font-bold uppercase text-slate-600">App Core</label>
+                                    <input value={settings.appName} onChange={e => updateSettings('appName', e.target.value)} className="input-fintech mb-1" placeholder="App Name" />
                                     <input value={settings.channel1} onChange={e => updateSettings('channel1', e.target.value)} className="input-fintech mb-1" placeholder="Channel 1" />
                                     <input value={settings.channel2} onChange={e => updateSettings('channel2', e.target.value)} className="input-fintech" placeholder="Channel 2" />
                                 </div>
@@ -341,21 +343,21 @@
                                         <input value={settings.currency} onChange={e => updateSettings('currency', e.target.value)} className="input-fintech" />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[8px] font-bold uppercase text-slate-600">Min Extraction</label>
+                                        <label className="text-[8px] font-bold uppercase text-slate-600">Min Pay</label>
                                         <input type="number" value={settings.minWithdrawal} onChange={e => updateSettings('minWithdrawal', Number(e.target.value))} className="input-fintech" />
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div className="space-y-1">
-                                        <label className="text-[8px] font-bold uppercase text-slate-600">Referral Bonus</label>
+                                        <label className="text-[8px] font-bold uppercase text-slate-600">Ref Bonus</label>
                                         <input type="number" value={settings.referralReward} onChange={e => updateSettings('referralReward', Number(e.target.value))} className="input-fintech" />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[8px] font-bold uppercase text-slate-600">PIN</label>
+                                        <label className="text-[8px] font-bold uppercase text-slate-600">Admin PIN</label>
                                         <input value={settings.adminPin} onChange={e => updateSettings('adminPin', e.target.value)} className="input-fintech" maxLength={4} />
                                     </div>
                                 </div>
-                                <button onClick={() => { db.ref('config/app').set(settings); showToast("Sync Complete", "⚙️"); }} className="btn-fintech py-3 mt-2">UPDATE PROTOCOL</button>
+                                <button onClick={() => { db.ref('config/app').set(settings); showToast("Global Protocol Updated", "⚙️"); }} className="btn-fintech py-3 mt-2">DEPLOY ALL UPDATES</button>
                             </div>
                         </div>
                     )}
@@ -371,7 +373,7 @@
             const [userSubs, setUserSubs] = useState([]);
             const [userWithdrawals, setUserWithdrawals] = useState([]);
             const [leaderboard, setLeaderboard] = useState([]);
-            const [lbSort, setLbSort] = useState('refs'); // 'refs' or 'balance'
+            const [lbSort, setLbSort] = useState('refs'); 
             const [config, setConfig] = useState({ 
                 appName: 'Prime Protocol', 
                 minWithdrawal: 1000, 
@@ -395,16 +397,21 @@
                 const uid = tg?.initDataUnsafe?.user?.id?.toString() || localStorage.getItem('prime_uid') || 'u_'+Math.random().toString(36).substr(2, 9);
                 localStorage.setItem('prime_uid', uid);
 
+                // FASTER LOADING: Fetch config and specific user only
+                    db.ref('config/app').on('value', s => s.exists() && setConfig(p => ({...p, ...s.val()})));
+                db.ref('tasks').on('value', s => setTasks(s.exists() ? Object.values(s.val()) : []));
+                
                 const userRef = db.ref(`users/${uid}`);
                 userRef.on('value', s => {
-                    if(s.exists()) { setUser(s.val()); setGatekeeper(false); }
-                        else { setGatekeeper(true); }
-                    setLoading(false);
+                    if(s.exists()) { 
+                        setUser(s.val()); 
+                        setGatekeeper(false); 
+                    } else { 
+                        setGatekeeper(true); 
+                    }
+                    setLoading(false); // UI shows up as soon as user is identified
                 });
 
-                db.ref('tasks').on('value', s => setTasks(s.exists() ? Object.values(s.val()) : []));
-                db.ref('config/app').on('value', s => s.exists() && setConfig(p => ({...p, ...s.val()})));
-                
                 db.ref('submissions').orderByChild('uid').equalTo(uid).on('value', s => {
                     setUserSubs(s.exists() ? Object.values(s.val()).reverse() : []);
                 });
@@ -413,22 +420,30 @@
                     setUserWithdrawals(s.exists() ? Object.values(s.val()).reverse() : []);
                 });
 
-                db.ref('users').on('value', s => {
-                    if(s.exists()) {
-                        const users = Object.values(s.val());
-                        setLeaderboard(users);
-                    }
+                // PERFORMANCE: Limit leaderboard to top 50 only
+                db.ref('users').orderByChild('referralCount').limitToLast(50).on('value', s => {
+                    if(s.exists()) setLeaderboard(Object.values(s.val()));
                 });
                 
                 return () => db.ref().off();
             }, []);
+
+            const sortedLeaderboard = useMemo(() => {
+                return [...leaderboard].sort((a, b) => {
+                    if(lbSort === 'refs') {
+                        if((b.referralCount || 0) === (a.referralCount || 0)) return (b.points || 0) - (a.points || 0);
+                        return (b.referralCount || 0) - (a.referralCount || 0);
+                    }
+                    return (b.points || 0) - (a.points || 0);
+                }).slice(0, 20);
+            }, [leaderboard, lbSort]);
 
             const join = async () => {
                 const uid = localStorage.getItem('prime_uid');
                 const start = tg?.initDataUnsafe?.start_param;
                 const newUser = { 
                     uid, 
-                    username: tg?.initDataUnsafe?.user?.username || 'user_'+uid.slice(-4), 
+                    username: tg?.initDataUnsafe?.user?.username || 'participant_'+uid.slice(-4), 
                     points: 0, 
                     referralCount: 0, 
                     timestamp: Date.now() 
@@ -447,26 +462,26 @@
                 
                 await db.ref(`users/${uid}`).set(newUser);
                 setGatekeeper(false);
-                showToast("Node Verified", "🛰️");
+                showToast("Identity Synced", "🛰️");
             };
 
-            const sortedLeaderboard = [...leaderboard].sort((a, b) => {
-                if(lbSort === 'refs') return (b.referralCount || 0) - (a.referralCount || 0);
-                return (b.points || 0) - (a.points || 0);
-            }).slice(0, 15);
-
-            if(loading) return <div className="fixed inset-0 flex flex-col items-center justify-center bg-[#080a11] text-white"><div className="w-8 h-8 border-3 border-[var(--accent)] border-t-transparent rounded-full animate-spin"></div></div>;
+            if(loading) return (
+                <div className="fixed inset-0 flex flex-col items-center justify-center bg-[#080a11] text-white">
+                    <div className="w-10 h-10 border-4 border-[var(--accent)] border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <p className="text-[9px] font-bold uppercase tracking-[4px] opacity-40">Syncing Protocol...</p>
+                </div>
+            );
 
             if(gatekeeper) return (
                 <div className="fixed inset-0 bg-[#080a11] p-6 flex flex-col items-center justify-center text-center animate-fade">
                     <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center text-3xl mb-5 border border-white/5 shadow-2xl">🔒</div>
-                    <h2 className="text-lg font-black mb-2 uppercase tracking-tight">Sync Pending</h2>
-                    <p className="text-[10px] text-slate-500 mb-8 uppercase tracking-widest leading-relaxed px-4">Initialize your node by joining our verified protocol channels.</p>
+                    <h2 className="text-lg font-black mb-2 uppercase tracking-tight">Node Offline</h2>
+                    <p className="text-[10px] text-slate-500 mb-8 uppercase tracking-widest leading-relaxed px-4">Initialize your node by joining our verified protocol communication channels.</p>
                     <div className="w-full space-y-2 mb-8">
                         {config.channel1 && <button onClick={() => window.open(config.channel1)} className="w-full py-3 bg-white/5 rounded-xl text-[10px] font-bold border border-white/5 uppercase">CHANNEL ALPHA</button>}
                         {config.channel2 && <button onClick={() => window.open(config.channel2)} className="w-full py-3 bg-white/5 rounded-xl text-[10px] font-bold border border-white/5 uppercase">CHANNEL BETA</button>}
                     </div>
-                    <button onClick={join} className="btn-fintech py-4 text-xs">JOIN & VERIFY NODE</button>
+                    <button onClick={join} className="btn-fintech py-4 text-xs">SYNCHRONIZE NODE</button>
                 </div>
             );
 
@@ -475,9 +490,9 @@
                     {showAdmin && <AdminPanel onExit={() => setShowAdmin(false)} tasks={tasks} appConfig={config} />}
                     {showPin && (
                         <div className="fixed inset-0 bg-black/98 flex flex-col items-center justify-center z-[9999] backdrop-blur-xl">
-                            <h2 className="text-[10px] font-bold uppercase text-[var(--accent)] mb-6 tracking-widest">Protocol Overload</h2>
+                            <h2 className="text-[10px] font-bold uppercase text-[var(--accent)] mb-6 tracking-widest">Protocol Overload Access</h2>
                             <input type="password" maxLength={4} onChange={e => { if(e.target.value === config.adminPin) { setShowAdmin(true); setShowPin(false); haptic.notify('success'); } }} className="w-32 bg-transparent border-b-2 border-white/10 text-center text-3xl font-bold text-white outline-none tracking-widest" placeholder="••••" autoFocus />
-                            <button onClick={() => setShowPin(false)} className="mt-8 text-[9px] font-bold text-slate-600 uppercase tracking-widest">CANCEL</button>
+                            <button onClick={() => setShowPin(false)} className="mt-8 text-[9px] font-bold text-slate-600 uppercase tracking-widest">CANCEL OVERRIDE</button>
                         </div>
                     )}
 
@@ -486,7 +501,7 @@
                             <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center font-bold text-xs border border-white/5 uppercase shadow-inner">{user?.username ? user.username[0] : 'U'}</div>
                             <div>
                                 <h1 className="text-[10px] font-bold tracking-tight">@{user?.username}</h1>
-                                <p className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">{config.appName} Echelon</p>
+                                <p className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">{config.appName} Protocol</p>
                             </div>
                         </div>
                         <div onClick={() => { setClicks(p=>p+1); if(clicks>=19){setClicks(0);setShowPin(true);} }} className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-xs border border-white/5 active:scale-90 transition-transform">⚡</div>
@@ -495,22 +510,22 @@
                     <main className="p-4 space-y-6">
                         {activeTab === 'earn' && (
                             <div className="space-y-4 animate-fade">
-                                <div className="bg-slate-900/60 rounded-[20px] p-5 text-center border border-white/5 relative overflow-hidden backdrop-blur-sm shadow-xl">
-                                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-[3px] mb-1">Grid Credits</p>
+                                <div className="bg-slate-900/60 rounded-[20px] p-6 text-center border border-white/5 relative overflow-hidden backdrop-blur-sm shadow-xl">
+                                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-[3px] mb-1">Available Credits</p>
                                     <h2 className="text-3xl font-black italic tracking-tighter">{safeFormat(user?.points)} <span className="text-[10px] opacity-20 not-italic uppercase">{config.currency}</span></h2>
                                     <div className="flex gap-2 mt-5">
-                                        <div className="flex-1 bg-white/5 py-2 rounded-lg text-[8px] font-bold uppercase border border-white/5">Missions: {userSubs.filter(s=>s.status==='approved').length}</div>
-                                        <div className="flex-1 bg-white/5 py-2 rounded-lg text-[8px] font-bold uppercase border border-white/5">Recruits: {user?.referralCount || 0}</div>
+                                        <div className="flex-1 bg-white/5 py-2.5 rounded-lg text-[8px] font-bold uppercase border border-white/5">Verified: {userSubs.filter(s=>s.status==='approved').length}</div>
+                                        <div className="flex-1 bg-white/5 py-2.5 rounded-lg text-[8px] font-bold uppercase border border-white/5">Recruits: {user?.referralCount || 0}</div>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <button onClick={() => { setActiveTab('tasks'); haptic.selection(); }} className="card p-4 flex flex-col items-center gap-2 group border-white/10">
+                                    <button onClick={() => { setActiveTab('tasks'); haptic.selection(); }} className="card p-4 flex flex-col items-center gap-2 group border-white/10 hover:bg-white/5 transition-colors">
                                         <span className="text-2xl">🎯</span>
-                                        <span className="text-[8px] font-bold uppercase tracking-widest text-slate-500">Missions</span>
+                                        <span className="text-[8px] font-bold uppercase tracking-widest text-slate-400">Mission Hub</span>
                                     </button>
-                                    <button onClick={() => { setActiveTab('frens'); haptic.selection(); }} className="card p-4 flex flex-col items-center gap-2 group border-white/10">
+                                    <button onClick={() => { setActiveTab('frens'); haptic.selection(); }} className="card p-4 flex flex-col items-center gap-2 group border-white/10 hover:bg-white/5 transition-colors">
                                         <span className="text-2xl">🤝</span>
-                                        <span className="text-[8px] font-bold uppercase tracking-widest text-slate-500">Network</span>
+                                        <span className="text-[8px] font-bold uppercase tracking-widest text-slate-400">Recruitment</span>
                                     </button>
                                 </div>
                             </div>
@@ -518,8 +533,8 @@
 
                         {activeTab === 'tasks' && (
                             <div className="space-y-3 animate-fade">
-                                <h3 className="text-[9px] font-bold uppercase text-slate-500 px-1 tracking-widest">Active Ops</h3>
-                                {tasks.length === 0 ? <p className="text-center opacity-10 py-10 uppercase text-[9px] tracking-widest">Scanning Grid...</p> : 
+                                <h3 className="text-[9px] font-bold uppercase text-slate-500 px-1 tracking-widest">Operational Tasks</h3>
+                                {tasks.length === 0 ? <p className="text-center opacity-10 py-10 uppercase text-[9px] tracking-widest">Scanning Network...</p> : 
                                     tasks.map(t => {
                                         const sub = userSubs.find(s => s.taskId === t.id);
                                         return <TaskCard key={t.id} task={t} user={user} isPending={sub?.status === 'pending'} isCompleted={sub?.status === 'approved'} currency={config.currency} />;
@@ -530,20 +545,24 @@
 
                         {activeTab === 'ranks' && (
                             <div className="space-y-3 animate-fade pb-10">
-                                <div className="flex justify-center gap-2 mb-2">
-                                    <button onClick={() => setLbSort('refs')} className={`px-3 py-1.5 rounded-lg text-[7px] font-bold uppercase tracking-widest border ${lbSort === 'refs' ? 'bg-[var(--accent)] text-black border-transparent' : 'bg-white/5 text-slate-500 border-white/5'}`}>Referrals</button>
-                                    <button onClick={() => setLbSort('balance')} className={`px-3 py-1.5 rounded-lg text-[7px] font-bold uppercase tracking-widest border ${lbSort === 'balance' ? 'bg-[var(--accent)] text-black border-transparent' : 'bg-white/5 text-slate-500 border-white/5'}`}>Balance</button>
+                                <h3 className="text-center text-[10px] font-bold uppercase text-slate-500 mb-1 tracking-[4px]">Top Protocol Nodes</h3>
+                                <div className="flex justify-center gap-2 mb-4">
+                                    <button onClick={() => setLbSort('refs')} className={`px-4 py-1.5 rounded-lg text-[7px] font-bold uppercase tracking-widest border ${lbSort === 'refs' ? 'bg-[var(--accent)] text-black border-transparent' : 'bg-white/5 text-slate-600 border-white/5'}`}>Sort By Refs</button>
+                                    <button onClick={() => setLbSort('balance')} className={`px-4 py-1.5 rounded-lg text-[7px] font-bold uppercase tracking-widest border ${lbSort === 'balance' ? 'bg-[var(--accent)] text-black border-transparent' : 'bg-white/5 text-slate-600 border-white/5'}`}>Sort By Points</button>
                                 </div>
                                 {sortedLeaderboard.map((u, i) => (
-                                    <div key={i} className={`card p-3 flex justify-between items-center bg-white/[0.01] ${u.uid === user?.uid ? 'border-[var(--accent)] bg-[var(--accent)]/5' : ''}`}>
+                                    <div key={i} className={`card p-3.5 flex justify-between items-center bg-white/[0.01] ${u.uid === user?.uid ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-white/5'}`}>
                                         <div className="flex items-center gap-3">
-                                            <span className="text-[9px] font-black text-slate-700 w-4">#{i+1}</span>
+                                            <span className="text-[9px] font-black text-slate-800 w-4">#{i+1}</span>
                                             <div className="flex flex-col">
-                                                <span className="text-[10px] font-bold">@{u.username}</span>
-                                                <span className="text-[7px] text-slate-600 uppercase">{u.referralCount || 0} recruits</span>
+                                                <span className="text-[10px] font-bold truncate max-w-[100px]">@{u.username}</span>
+                                                <span className="text-[7px] text-slate-600 uppercase font-bold">{u.referralCount || 0} RECRUITS SYNCED</span>
                                             </div>
                                         </div>
-                                        <span className="text-[10px] font-black text-[var(--accent)]">{safeFormat(u.points)}</span>
+                                        <div className="text-right">
+                                            <span className="text-[10px] font-black text-[var(--accent)] italic">{safeFormat(u.points)}</span>
+                                            <p className="text-[6px] text-slate-700 font-bold uppercase">{config.currency}</p>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -552,12 +571,13 @@
                         {activeTab === 'frens' && (
                             <div className="text-center pt-8 animate-fade px-2">
                                 <div className="w-16 h-16 bg-white/5 rounded-2xl mx-auto flex items-center justify-center text-3xl mb-4 border border-white/5 shadow-2xl">🤝</div>
-                                <h3 className="text-xl font-black italic mb-2 tracking-tighter uppercase">Recruit Grid</h3>
-                                <p className="text-[10px] text-slate-500 mb-8 uppercase leading-relaxed tracking-wider">Intercept <span className="text-[var(--accent)] font-bold">+{config.referralReward} {config.currency}</span> for every verified signal synced to your node.</p>
+                                <h3 className="text-xl font-black italic mb-2 tracking-tighter uppercase">Expand Network</h3>
+                                <p className="text-[10px] text-slate-500 mb-8 uppercase leading-relaxed tracking-wider">Acquire <span className="text-[var(--accent)] font-bold">+{config.referralReward} {config.currency}</span> for every verified signal synced to your node.</p>
                                 <button onClick={() => { 
+                                    if(!config.botUsername) return showToast("Bot configuration missing", "⚠️");
                                     const botLink = `https://t.me/${config.botUsername}/${config.appShortName}?startapp=${user?.uid}`;
                                     navigator.clipboard.writeText(botLink); 
-                                    showToast("Link Synced", "📋"); 
+                                    showToast("Protocol Link Copied", "📋"); 
                                     haptic.impact('medium');
                                 }} className="btn-fintech py-4 text-[10px] tracking-widest">GENERATE RECRUIT LINK</button>
                             </div>
@@ -566,14 +586,14 @@
                         {activeTab === 'wallet' && (
                             <div className="space-y-6 animate-fade pb-12">
                                 <div className="card p-5 text-center bg-slate-900/50 border-none shadow-inner">
-                                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-1">Extraction Ready</p>
+                                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-1">Capital Extraction</p>
                                     <h2 className="text-3xl font-black italic tracking-tighter">{safeFormat(user?.points)} <span className="text-xs opacity-20 not-italic">{config.currency}</span></h2>
                                 </div>
                                 <div className="card p-4 space-y-3">
                                     <h3 className="text-[9px] font-bold text-slate-500 uppercase px-1">Withdraw Assets</h3>
                                     <input type="number" id="wAmt" className="input-fintech" placeholder={`Min Extraction: ${config.minWithdrawal}`} />
                                     <input id="wBank" className="input-fintech" placeholder="Institution" />
-                                    <input id="wAcc" className="input-fintech" placeholder="Account Identifier" maxLength={10} />
+                                    <input id="wAcc" className="input-fintech" placeholder="Account ID" maxLength={10} />
                                     <button onClick={async () => {
                                         const amt = Number(document.getElementById('wAmt').value);
                                         const b = document.getElementById('wBank').value;
@@ -590,14 +610,14 @@
                                         document.getElementById('wAmt').value = '';
                                         document.getElementById('wBank').value = '';
                                         document.getElementById('wAcc').value = '';
-                                        showToast("Withdrawal Synced", "🛰️");
+                                        showToast("Extraction Initialized", "🛰️");
                                     }} className="btn-fintech py-4 text-[10px] tracking-widest">INITIALIZE EXTRACTION</button>
                                 </div>
                                 
                                 <div className="space-y-4">
                                     <div className="space-y-2">
-                                        <h4 className="text-[8px] font-bold text-slate-500 uppercase tracking-widest px-1">Mission Log</h4>
-                                        {userSubs.length === 0 ? <p className="text-[7px] text-center py-4 opacity-20">No Missions Recorded</p> : 
+                                        <h4 className="text-[8px] font-bold text-slate-500 uppercase tracking-widest px-1">Mission Log (Latest)</h4>
+                                        {userSubs.length === 0 ? <p className="text-[7px] text-center py-4 opacity-20">No Missions Syncing</p> : 
                                             userSubs.slice(0, 5).map(s => (
                                                 <div key={s.id} className="flex justify-between items-center bg-white/[0.02] p-2 rounded-lg border border-white/5">
                                                     <span className="text-[8px] font-bold uppercase truncate max-w-[150px]">{s.taskTitle}</span>
@@ -607,11 +627,14 @@
                                         }
                                     </div>
                                     <div className="space-y-2">
-                                        <h4 className="text-[8px] font-bold text-slate-500 uppercase tracking-widest px-1">Extraction Log</h4>
+                                        <h4 className="text-[8px] font-bold text-slate-500 uppercase tracking-widest px-1">Extraction Log (Latest)</h4>
                                         {userWithdrawals.length === 0 ? <p className="text-[7px] text-center py-4 opacity-20">No Extractions Recorded</p> : 
                                             userWithdrawals.slice(0, 5).map(w => (
                                                 <div key={w.id} className="flex justify-between items-center bg-white/[0.02] p-2 rounded-lg border border-white/5">
-                                                    <span className="text-[8px] font-bold uppercase truncate">{safeFormat(w.amount)} {w.currency}</span>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[8px] font-bold uppercase">{safeFormat(w.amount)} {w.currency}</span>
+                                                        <span className="text-[6px] text-slate-600">{w.bankName}</span>
+                                                    </div>
                                                     <span className={`status-chip status-${w.status}`}>{w.status}</span>
                                                 </div>
                                             ))
@@ -625,24 +648,4 @@
                     <nav className="fixed bottom-4 left-4 right-4 h-14 nav-pill rounded-[18px] flex items-center justify-around z-50 px-1 shadow-2xl">
                         {[
                             { id: 'earn', icon: '🏠', label: 'HUB' },
-                            { id: 'tasks', icon: '🎯', label: 'EARN' },
-                            { id: 'ranks', icon: '🏆', label: 'RANK' },
-                            { id: 'frens', icon: '🤝', label: 'GRID' },
-                            { id: 'wallet', icon: '🏦', label: 'VAULT' }
-                        ].map(t => (
-                            <button key={t.id} onClick={() => { setActiveTab(t.id); haptic.selection(); }} className={`flex flex-col items-center justify-center w-11 h-11 rounded-xl transition-all ${activeTab === t.id ? 'bg-[var(--accent)] text-black' : 'text-slate-600'}`}>
-                                <span className="text-lg">{t.icon}</span>
-                                <span className="text-[6px] font-black mt-0.5 uppercase tracking-tighter">{t.label}</span>
-                            </button>
-                        ))}
-                    </nav>
-                </div>
-            );
-        };
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
-    
+                            
