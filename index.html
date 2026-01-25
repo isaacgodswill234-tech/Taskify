@@ -592,8 +592,8 @@
                                 <div className="card p-4 space-y-3">
                                     <h3 className="text-[9px] font-bold text-slate-500 uppercase px-1">Withdraw Assets</h3>
                                     <input type="number" id="wAmt" className="input-fintech" placeholder={`Min Extraction: ${config.minWithdrawal}`} />
-                                    <input id="wBank" className="input-fintech" placeholder="Institution" />
-                                    <input id="wAcc" className="input-fintech" placeholder="Account ID" maxLength={10} />
+                                    <input id="wBank" className="input-fintech" placeholder="Bank name" />
+                                    <input id="wAcc" className="input-fintech" placeholder="Account number" maxLength={10} />
                                     <button onClick={async () => {
                                         const amt = Number(document.getElementById('wAmt').value);
                                         const b = document.getElementById('wBank').value;
@@ -648,4 +648,24 @@
                     <nav className="fixed bottom-4 left-4 right-4 h-14 nav-pill rounded-[18px] flex items-center justify-around z-50 px-1 shadow-2xl">
                         {[
                             { id: 'earn', icon: '🏠', label: 'HUB' },
-                            
+                            { id: 'tasks', icon: '🎯', label: 'EARN' },
+                            { id: 'ranks', icon: '🏆', label: 'RANK' },
+                            { id: 'frens', icon: '🤝', label: 'GRID' },
+                            { id: 'wallet', icon: '🏦', label: 'VAULT' }
+                        ].map(t => (
+                            <button key={t.id} onClick={() => { setActiveTab(t.id); haptic.selection(); }} className={`flex flex-col items-center justify-center w-11 h-11 rounded-xl transition-all ${activeTab === t.id ? 'bg-[var(--accent)] text-black' : 'text-slate-600'}`}>
+                                <span className="text-lg">{t.icon}</span>
+                                <span className="text-[6px] font-black mt-0.5 uppercase tracking-tighter">{t.label}</span>
+                            </button>
+                        ))}
+                    </nav>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
