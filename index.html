@@ -547,5 +547,145 @@
                             </div>
                         )}
                     </main>
+                    <nav className="fixed bottom-4 left-4 right-4 h-14 nav-pill rounded-[20px] flex items-center justify-around z-50 border border-white/5 shadow-2xl">
+                        {[
+                            { id: 'home', icon: '🏠', label: 'Home' },
+                            { id: 'tasks', icon: '🎯', label: 'Earn' },
+                            { id: 'invite', icon: '🤝', label: 'Invite' },
+                            { id: 'wallet', icon: '🏦', label: 'Wallet' }
+                        ].map(t => (
+                            <button key={t.id} onClick={() => setTab(t.id)} className={`flex flex-col items-center gap-0.5 transition-all ${tab === t.id ? 'text-[var(--accent)] scale-105' : 'text-slate-500 opacity-30'}`}>
+                                <span className="text-lg">{t.icon}</span>
+                                <span className="text-[6px] font-black uppercase italic">{t.label}</span>
+                            </button>
+                        ))}
+                    </nav>
+                </div>
+            );
+        };
 
+        const DevHub = ({ onExit, config }) => {
+            const [settings, setSettings] = useState({ ...config });
+            const save = async () => { await db.ref('config/app').update(settings); showToast("Redeployed", "⚙️"); };
+            return (
+                <div className="fixed inset-0 bg-[#080a11] p-5 z-[2000] overflow-y-auto no-scrollbar pb-10">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-sm font-black uppercase italic">Dev Core</h2>
+                        <button onClick={onExit} className="bg-white/5 w-7 h-7 rounded-full flex items-center justify-center text-xs">✕</button>
+                    </div>
+                    <div className="space-y-4">
+                        <div className="card p-4 space-y-2">
+                            <p className="text-[8px] font-black text-slate-600 uppercase">Auth & Infrastructure</p>
+                            <input type="password" placeholder="Bot Token" className="input-field" value={settings.botToken || ''} onChange={e => setSettings({...settings, botToken: e.target.value})} />
+                            <input placeholder="Bot User (no @)" className="input-field" value={settings.botUsername || ''} onChange={e => setSettings({...settings, botUsername: e.target.value})} />
+                            <input placeholder="WebApp Short Name" className="input-field" value={settings.appShortName || ''} onChange={e => setSettings({...settings, appShortName: e.target.value})} />
+                            <input placeholder="Admin IDs (comma list)" className="input-field" value={settings.adminUid || ''} onChange={e => setSettings({...settings, adminUid: e.target.value})} />
+                        </div>
+                        <div className="card p-4 space-y-2">
+                            <p className="text-[8px] font-black text-slate-600 uppercase">Internal Channels (IDs)</p>
+                            <input placeholder="Task Submission Channel ID" className="input-field" value={settings.submissionChannelId || ''} onChange={e => setSettings({...settings, submissionChannelId: e.target.value})} />
+                            <input placeholder="Withdrawal Channel ID" className="input-field" value={settings.withdrawalChannelId || ''} onChange={e => setSettings({...settings, withdrawalChannelId: e.target.value})} />
+                        </div>
+                        <div className="card p-4 space-y-2">
+                            <p className="text-[8px] font-black text-slate-600 uppercase">Public Channel Links (For User View)</p>
+                            <input placeholder="Task Submission Channel URL" className="input-field" value={settings.submissionChannelUrl || ''} onChange={e => setSettings({...settings, submissionChannelUrl: e.target.value})} />
+                            <input placeholder="Withdrawal Channel URL" className="input-field" value={settings.withdrawalChannelUrl || ''} onChange={e => setSettings({...settings, withdrawalChannelUrl: e.target.value})} />
+                        </div>
+                        <button onClick={save} className="btn-primary h-11 italic">UPDATE INFRASTRUCTURE</button>
+                    </div>
+                </div>
+            );
+        };
+
+        const AdminHub = ({ onExit, config, tasks }) => {
+            const [settings, setSettings] = useState({ ...config });
+            const [newTask, setNewTask] = useState({ icon: '🎯', title: '', reward: 100, description: '', link: '' });
+            const save = async () => { await db.ref('config/app').update(settings); showToast("Committed", "💾"); };
+            
+            return (
+                <div className="fixed inset-0 bg-[#080a11] p-5 z-[1500] overflow-y-auto no-scrollbar pb-20">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-sm font-black uppercase italic">Admin Panel</h2>
+                        <button onClick={onExit} className="bg-white/5 w-7 h-7 rounded-full flex items-center justify-center text-xs">✕</button>
+                    </div>
+                    <div className="space-y-4">
+                        <div className="card p-4 space-y-2">
+                            <p className="text-[8px] font-black uppercase text-slate-600 mb-1">Global Config</p>
+                            <input placeholder="App Title" className="input-field" value={settings.appName || ''} onChange={e => setSettings({...settings, appName: e.target.value})} />
+                            <div className="grid grid-cols-2 gap-2">
+                                <input type="number" placeholder="Min Pay" className="input-field" value={settings.minWithdrawal || ''} onChange={e => setSettings({...settings, minWithdrawal: Number(e.target.value)})} />
+                                <input type="number" placeholder="Ref Pay" className="input-field" value={settings.referralReward || ''} onChange={e => setSettings({...settings, referralReward: Number(e.target.value)})} />
+                            </div>
+                            <input placeholder="Currency (₦)" className="input-field" value={settings.currency || ''} onChange={e => setSettings({...settings, currency: e.target.value})} />
+                        </div>
+
+                        <div className="card p-4 space-y-2">
+                            <p className="text-[8px] font-black uppercase text-slate-600 mb-1">Access Gates (Security)</p>
+                            <div className="space-y-4">
+                                {[1, 2, 3].map(i => (
+                                    <div key={i} className="space-y-1">
+                                        <p className="text-[7px] font-black text-slate-500 ml-1">CHANNEL {i}</p>
+                                        <input placeholder={`Channel ${i} Name`} className="input-field" value={settings[`chan${i}Name`] || ''} onChange={e => setSettings({...settings, [`chan${i}Name`]: e.target.value})} />
+                                        <input placeholder={`Channel ${i} Join URL`} className="input-field" value={settings[`chan${i}Url`] || ''} onChange={e => setSettings({...settings, [`chan${i}Url`]: e.target.value})} />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="card p-4 space-y-2">
+                            <p className="text-[8px] font-black uppercase text-slate-600 mb-1">Tracking Channels (URLs)</p>
+                            <input placeholder="View Proofs Channel URL" className="input-field" value={settings.submissionChannelUrl || ''} onChange={e => setSettings({...settings, submissionChannelUrl: e.target.value})} />
+                            <input placeholder="View Payouts Channel URL" className="input-field" value={settings.withdrawalChannelUrl || ''} onChange={e => setSettings({...settings, withdrawalChannelUrl: e.target.value})} />
+                        </div>
+
+                        <div className="card p-4 space-y-2">
+                            <p className="text-[8px] font-black uppercase text-slate-600">Mission Factory</p>
+                            <div className="grid grid-cols-4 gap-2">
+                                <input placeholder="Icon" className="input-field" value={newTask.icon} onChange={e => setNewTask({...newTask, icon: e.target.value})} />
+                                <input placeholder="Title" className="input-field col-span-3" value={newTask.title} onChange={e => setNewTask({...newTask, title: e.target.value})} />
+                            </div>
+                            <input type="number" placeholder="Reward" className="input-field" value={newTask.reward} onChange={e => setNewTask({...newTask, reward: Number(e.target.value)})} />
+                            <textarea placeholder="Description" className="input-field h-14" value={newTask.description} onChange={e => setNewTask({...newTask, description: e.target.value})} />
+                            <input placeholder="Task Link" className="input-field" value={newTask.link} onChange={e => setNewTask({...newTask, link: e.target.value})} />
+                            <button onClick={async () => { if(!newTask.title) return; const id = 't_' + Date.now(); await db.ref(`tasks/${id}`).set({ ...newTask, id }); setNewTask({ icon: '🎯', title: '', reward: 100, description: '', link: '' }); showToast("Deployed", "🚀"); }} className="btn-primary italic">ADD MISSION</button>
+                        </div>
+                        <div className="space-y-1.5">
+                            {tasks.map(t => (
+                                <div key={t.id} className="card p-2 flex justify-between items-center text-[9px] font-bold">
+                                    <span>{t.icon} {t.title}</span>
+                                    <button onClick={() => db.ref(`tasks/${t.id}`).remove()} className="text-red-500 uppercase text-[7px]">Delete</button>
+                                </div>
+                            ))}
+                        </div>
+                        <button onClick={save} className="btn-primary h-11 italic">SAVE SETTINGS</button>
+                    </div>
+                </div>
+            );
+        };
+
+        const PinModal = ({ title, onConfirm, onCancel }) => {
+            const [pin, setPin] = useState('');
+            return (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[3000] flex items-center justify-center p-6">
+                    <div className="card w-full max-w-[240px] p-5 space-y-3">
+                        <div className="text-center">
+                            <h3 className="text-sm font-black uppercase italic">{title}</h3>
+                            <p className="text-[8px] text-slate-500 uppercase font-bold mt-1">Auth Required</p>
+                        </div>
+                        <input type="password" className="input-field text-center text-lg tracking-[0.8em] h-12" placeholder="****" maxLength={6} value={pin} autoFocus onChange={e => setPin(e.target.value)} />
+                        <div className="flex gap-2">
+                            <button onClick={onCancel} className="flex-1 py-2.5 bg-white/5 rounded-lg font-bold text-[9px] uppercase">Cancel</button>
+                            <button onClick={() => onConfirm(pin)} className="btn-primary flex-1">Enter</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+    
     
