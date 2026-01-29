@@ -29,7 +29,7 @@
             font-family: 'Plus Jakarta Sans', sans-serif;
             margin: 0; padding: 0;
             overflow-x: hidden;
-            font-size: 11px; /* Shrunk for Android mobile fit */
+            font-size: 11px;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
         }
@@ -44,7 +44,7 @@
 
         .card {
             background: var(--card-bg);
-            border-radius: 14px; /* Shrunk */
+            border-radius: 14px;
             border: 1px solid rgba(255, 255, 255, 0.03);
         }
 
@@ -66,6 +66,18 @@
         }
         .btn-primary:active { transform: scale(0.96); }
         .btn-primary:disabled { opacity: 0.4; filter: grayscale(1); }
+
+        .btn-outline {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            font-weight: 800;
+            border-radius: 10px;
+            padding: 8px;
+            text-transform: uppercase;
+            font-size: 9px;
+            transition: all 0.2s;
+        }
 
         .input-field {
             background: rgba(0, 0, 0, 0.4);
@@ -155,7 +167,6 @@
             
             const channelId = formatChannelId(channelIdRaw);
             const botLink = `https://t.me/${config.botUsername}/${config.appShortName}`;
-            const promoFooter = `\n\n🚀 <b>Join & Earn Now:</b>\n<a href="${botLink}">${botLink}</a>`;
             
             let response;
             if (type === 'task') {
@@ -163,47 +174,67 @@
                 const formData = new FormData();
                 formData.append('chat_id', channelId);
                 formData.append('photo', blob, 'p.jpg');
-                const keyboard = { inline_keyboard: [[
-                    { text: "✅ APPROVE", url: `${botLink}?startapp=apr_${data.uid}_${data.reward}_${data.taskId}` }, 
-                    { text: "❌ DECLINE", url: `${botLink}?startapp=dec_${data.uid}_${data.taskId}` }
-                ]] };
-                
-                const caption = `📝 <b>NEW TASK PROOF</b>\nUser: @${escapeHTML(data.username)}\nTask: ${escapeHTML(data.taskTitle)}\nReward: ${data.reward} ${escapeHTML(config.currency)}\nUID: <code>${escapeHTML(data.uid)}</code>${promoFooter}`;
-                
+                const caption = `📝 <b>NEW TASK PROOF</b>\nUser: @${escapeHTML(data.username)}\nTask: ${escapeHTML(data.taskTitle)}\nReward: ${data.reward} ${escapeHTML(config.currency)}\nUID: <code>${escapeHTML(data.uid)}</code>`;
                 formData.append('caption', caption);
                 formData.append('parse_mode', 'HTML');
-                formData.append('reply_markup', JSON.stringify(keyboard));
-                response = await fetch(`https://api.telegram.org/bot${config.botToken}/sendPhoto`, { method: 'POST', body: formData });
+                
+                const sendRes = await fetch(`https://api.telegram.org/bot${config.botToken}/sendPhoto`, { method: 'POST', body: formData });
+                const sendJson = await sendRes.json();
+                
+                if(sendJson.ok) {
+                    const msgId = sendJson.result.message_id;
+                    const keyboard = { inline_keyboard: [[
+                        { text: "✅ APPROVE", url: `${botLink}?startapp=apr_${data.uid}_${data.reward}_${data.taskId}_${msgId}` }, 
+                        { text: "❌ DECLINE", url: `${botLink}?startapp=dec_${data.uid}_${data.taskId}_${msgId}` }
+                    ]] };
+                    await fetch(`https://api.telegram.org/bot${config.botToken}/editMessageReplyMarkup`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ chat_id: channelId, message_id: msgId, reply_markup: keyboard })
+                    });
+                }
+                return sendJson;
             } else if (type === 'task_status') {
                 const isApproved = data.status === 'approved';
-                const text = `📢 <b>TASK ${isApproved ? 'APPROVED ✅' : 'DECLINED ❌'}</b>\nUser: @${escapeHTML(data.username)}\nReward: ${isApproved ? data.reward : 0} ${escapeHTML(config.currency)}\nStatus: ${isApproved ? 'Successfully Credited' : 'Submission Rejected'}${promoFooter}`;
+                const text = `📢 <b>TASK ${isApproved ? 'APPROVED ✅' : 'DECLINED ❌'}</b>\nUser: @${escapeHTML(data.username)}\nReward: ${isApproved ? data.reward : 0} ${escapeHTML(config.currency)}\nStatus: ${isApproved ? 'Successfully Credited' : 'Submission Rejected'}`;
                 response = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, { 
-                    method: 'POST', 
+                                                                                      method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
                     body: JSON.stringify({ chat_id: channelId, text, parse_mode: 'HTML' }) 
                 });
             } else if (type === 'payout') {
-                const keyboard = { inline_keyboard: [[
-                    { text: "💰 MARK PAID", url: `${botLink}?startapp=pyd_${data.uid}_${data.amount}` }, 
-                    { text: "🔙 REFUND", url: `${botLink}?startapp=ref_${data.uid}_${data.amount}` }
-                ]] };
-                const text = `💸 <b>NEW WITHDRAWAL</b>\nUser: @${escapeHTML(data.username)}\nAmt: ${data.amount} ${escapeHTML(config.currency)}\nBank: ${escapeHTML(data.bankName)}\nAcc: <code>${escapeHTML(data.accountNumber)}</code>${promoFooter}`;
+                const text = `💸 <b>NEW WITHDRAWAL</b>\nUser: @${escapeHTML(data.username)}\nAmt: ${data.amount} ${escapeHTML(config.currency)}\nBank: ${escapeHTML(data.bankName)}\nAcc: <code>${escapeHTML(data.accountNumber)}</code>`;
+                const sendRes = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ chat_id: channelId, text, parse_mode: 'HTML' }) 
+                });
+                const sendJson = await sendRes.json();
+
+                if(sendJson.ok) {
+                    const msgId = sendJson.result.message_id;
+                    const keyboard = { inline_keyboard: [[
+                        { text: "💰 MARK PAID", url: `${botLink}?startapp=pyd_${data.uid}_${data.amount}_${msgId}` }, 
+                        { text: "🔙 REFUND", url: `${botLink}?startapp=ref_${data.uid}_${data.amount}_${msgId}` }
+                    ]] };
+                    await fetch(`https://api.telegram.org/bot${config.botToken}/editMessageReplyMarkup`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ chat_id: channelId, message_id: msgId, reply_markup: keyboard })
+                    });
+                }
+                return sendJson;
+            } else if (type === 'payout_status') {
+                const isPaid = data.status === 'paid';
+                const text = `🏦 <b>PAYOUT ${isPaid ? 'PAID ✅' : 'REFUNDED 🔙'}</b>\nUser: @${escapeHTML(data.username)}\nAmount: ${data.amount} ${escapeHTML(config.currency)}\nStatus: ${isPaid ? 'Transfer Completed' : 'Refund Processed'}`;
                 response = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ chat_id: channelId, text, parse_mode: 'HTML', reply_markup: keyboard }) 
-                });
-            } else if (type === 'payout_status') {
-                const isPaid = data.status === 'paid';
-                const text = `🏦 <b>PAYOUT ${isPaid ? 'PAID ✅' : 'REFUNDED 🔙'}</b>\nUser: @${escapeHTML(data.username)}\nAmount: ${data.amount} ${escapeHTML(config.currency)}\nStatus: ${isPaid ? 'Transfer Completed' : 'Refund Processed'}${promoFooter}`;
-                response = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, { 
-                    method: 'POST', 
-                        headers: { 'Content-Type': 'application/json' }, 
                     body: JSON.stringify({ chat_id: channelId, text, parse_mode: 'HTML' }) 
                 });
             }
 
-            return await response.json();
+            return response ? await response.json() : { ok: true };
         };
 
         const TaskCard = ({ task, user, currency, config }) => {
@@ -228,7 +259,7 @@
 
             return (
                 <div className="card mb-2 overflow-hidden bg-white/[0.02]">
-                    <div onClick={() => !isPending && setExpanded(!expanded)} className={`p-2.5 flex items-center justify-between transition-colors ${isPending ? 'opacity-40 grayscale' : 'active:bg-white/5'}`}>
+                    <div onClick={() => !isPending && setExpanded(!expanded)} className={`p-2.5 flex items-center justify-between transition-colors ${isPending ? 'opacity-70 bg-white/5' : 'active:bg-white/5'}`}>
                         <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-lg">{task.icon || '⭐'}</div>
                             <div>
@@ -237,7 +268,12 @@
                             </div>
                         </div>
                         {isPending ? (
-                            <div className="text-[7px] font-black uppercase text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded">Pending</div>
+                            <div className="flex flex-col items-end gap-1">
+                                <div className="text-[7px] font-black uppercase text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded">Under Review</div>
+                                {config.submissionChannelUrl && (
+                                    <button onClick={(e) => { e.stopPropagation(); window.open(config.submissionChannelUrl, '_blank'); }} className="text-[6px] font-black text-[var(--accent)] underline uppercase tracking-widest">View Submissions</button>
+                                )}
+                            </div>
                         ) : (
                             <span className={`text-[9px] opacity-20 transition-transform ${expanded ? 'rotate-180' : ''}`}>▼</span>
                         )}
@@ -262,13 +298,6 @@
                             </button>
                         </div>
                     )}
-                    {isPending && config.publicSubmissions && (
-                        <div className="px-2.5 pb-2.5">
-                            <button onClick={() => window.open(`https://t.me/${config.publicSubmissions.replace('@', '')}`, '_blank')} className="w-full py-2 bg-amber-500/5 rounded-lg text-[8px] font-black border border-amber-500/10 text-amber-500 uppercase flex items-center justify-center gap-1.5">
-                                👁️ View Proof in Channel
-                            </button>
-                        </div>
-                    )}
                 </div>
             );
         };
@@ -278,7 +307,14 @@
             const [loading, setLoading] = useState(true);
             const [tab, setTab] = useState('home');
             const [tasks, setTasks] = useState([]);
-            const [config, setConfig] = useState({ appName: 'EarnHub', minWithdrawal: 1000, referralReward: 500, currency: '₦', adminPin: '2025', devPin: '5050' });
+            const [config, setConfig] = useState({ 
+                appName: 'EarnHub', 
+                minWithdrawal: 1000, 
+                referralReward: 500, 
+                currency: '₦', 
+                adminPin: '2025', 
+                devPin: '5050'
+            });
             const [showAdmin, setShowAdmin] = useState(false);
             const [showDev, setShowDev] = useState(false);
             const [showPinModal, setShowPinModal] = useState(null);
@@ -294,6 +330,7 @@
                 const targetUid = parts[1];
                 const value = parts[2];
                 const extra = parts[3];
+                const msgId = parts[4];
 
                 setProcessing(`Processing ${action.toUpperCase()}...`);
                 
@@ -318,6 +355,16 @@
                         await db.ref(`users/${targetUid}/points`).transaction(p => (p || 0) + Number(value));
                         await sendToTelegram('payout_status', { username: targetUser.username, status: 'refunded', amount: value }, currentConfig);
                         showToast("Refunded!", "🔙");
+                    }
+
+                    if(msgId && currentConfig.botToken) {
+                        const channelIdRaw = ['apr', 'dec'].includes(action) ? currentConfig.submissionChannelId : currentConfig.withdrawalChannelId;
+                        const channelId = formatChannelId(channelIdRaw);
+                        await fetch(`https://api.telegram.org/bot${currentConfig.botToken}/deleteMessage`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ chat_id: channelId, message_id: msgId })
+                        });
                     }
                 } catch(e) { showToast(`Error: ${e.message}`, "⚠️"); }
                 finally { setProcessing(null); setTab('home'); }
@@ -351,7 +398,7 @@
 
                 db.ref('tasks').on('value', s => setTasks(s.exists() ? Object.values(s.val()) : []));
                 return () => db.ref().off();
-            }, []);
+                }, []);
 
             const verifyPin = (pin) => {
                 if (showPinModal === 'admin') {
@@ -374,17 +421,23 @@
                 <div className="fixed inset-0 bg-[#0c0f16] p-8 flex flex-col items-center justify-center text-center">
                     <div className="w-16 h-16 rounded-[24px] bg-[var(--accent)]/10 text-[var(--accent)] flex items-center justify-center text-4xl mb-6">💰</div>
                     <h2 className="text-xl font-black mb-2 italic">Welcome to {config.appName}</h2>
-                    <p className="text-slate-500 mb-8 text-[10px] opacity-70">The ultimate hub for micro-tasks and fast rewards.</p>
+                    <p className="text-slate-500 mb-8 text-[10px] opacity-70">Complete tasks and earn fast rewards.</p>
                     <button onClick={async () => {
                         const uid = localStorage.getItem('eh_uid');
                         const start = tg?.initDataUnsafe?.start_param;
                         const newUser = { uid, username: tg?.initDataUnsafe?.user?.username || 'user_'+uid.slice(-4), points: 0, referrals: 0, joined: false };
+                        
                         if(start && start.startsWith('u_')) {
-                            db.ref(`users/${start}`).transaction(u => { 
-                                if(u) { u.points = (u.points || 0) + (config.referralReward || 500); u.referrals = (u.referrals || 0) + 1; } 
+                            const referrerId = start.replace('u_', '');
+                            db.ref(`users/${referrerId}`).transaction(u => { 
+                                if(u) { 
+                                    u.points = (u.points || 0) + (config.referralReward || 500); 
+                                    u.referrals = (u.referrals || 0) + 1; 
+                                } 
                                 return u; 
                             });
                         }
+                        
                         await db.ref(`users/${uid}`).set(newUser);
                     }} className="btn-primary h-12">GET STARTED</button>
                 </div>
@@ -393,12 +446,12 @@
             if(joinGate) return (
                 <div className="fixed inset-0 bg-[#0c0f16] p-6 flex flex-col items-center justify-center text-center z-[9000]">
                     <h2 className="text-lg font-black mb-3 uppercase tracking-tighter">Security Check</h2>
-                    <p className="text-slate-500 text-[9px] mb-6 uppercase font-black opacity-60">Follow our channels to proceed</p>
+                    <p className="text-slate-500 text-[9px] mb-6 uppercase font-black opacity-60">Join our channels to proceed</p>
                     <div className="w-full space-y-2 mb-8">
                         {[1, 2, 3].map(i => config[`chan${i}Url`] && (
                             <button key={i} onClick={() => window.open(config[`chan${i}Url`], '_blank')} className="w-full py-2.5 bg-white/5 rounded-xl border border-white/10 text-[10px] font-black uppercase italic">
                                 🔗 JOIN {config[`chan${i}Name`] || `CHANNEL ${i}`}
-                                </button>
+                            </button>
                         ))}
                     </div>
                     <button onClick={async () => { await db.ref(`users/${user.uid}/joined`).set(true); showToast("Welcome!", "✅"); }} className="btn-primary h-12">I'VE JOINED</button>
@@ -436,6 +489,11 @@
                                     </div>
                                 </div>
                                 <button onClick={() => setTab('tasks')} className="btn-primary h-12 italic">START MISSIONS</button>
+                                {config.withdrawalChannelUrl && (
+                                    <button onClick={() => window.open(config.withdrawalChannelUrl, '_blank')} className="btn-outline italic flex items-center justify-center gap-2">
+                                        <span>📜</span> VIEW PAYOUT HISTORY
+                                    </button>
+                                )}
                             </div>
                         )}
                         {tab === 'tasks' && (
@@ -469,13 +527,15 @@
                                             document.querySelectorAll('.input-field').forEach(i => i.value = '');
                                         } catch(e) { showToast(`Error: ${e.message}`, "⚠️"); }
                                         finally { e.currentTarget.disabled = false; }
-                                    }} className="btn-primary h-12">CONFIRM WITHDRAWAL</button>
+                                    }} className="btn-primary h-12 italic">CONFIRM WITHDRAWAL</button>
+                                    
+                                    <div className="pt-2 border-t border-white/5 flex flex-col items-center gap-1 text-center">
+                                        <p className="text-[7px] font-bold text-slate-500 uppercase tracking-tighter">Advised: Track your payment in the payout channel below to avoid mistakes.</p>
+                                        {config.withdrawalChannelUrl && (
+                                            <button onClick={() => window.open(config.withdrawalChannelUrl, '_blank')} className="text-[8px] font-black text-[var(--accent)] underline uppercase tracking-widest">Open Payout Channel</button>
+                                        )}
+                                    </div>
                                 </div>
-                                {config.publicPayouts && (
-                                    <button onClick={() => window.open(`https://t.me/${config.publicPayouts.replace('@', '')}`, '_blank')} className="w-full py-2.5 bg-white/5 rounded-xl border border-white/10 text-[8px] font-black uppercase text-slate-400 flex items-center justify-center gap-1.5">
-                                        💸 Live Payout History
-                                    </button>
-                                )}
                             </div>
                         )}
                         {tab === 'invite' && (
@@ -488,119 +548,4 @@
                         )}
                     </main>
 
-                    <nav className="fixed bottom-4 left-4 right-4 h-14 nav-pill rounded-[20px] flex items-center justify-around z-50 border border-white/5 shadow-2xl">
-                        {[
-                            { id: 'home', icon: '🏠', label: 'Home' },
-                            { id: 'tasks', icon: '🎯', label: 'Earn' },
-                            { id: 'invite', icon: '🤝', label: 'Invite' },
-                            { id: 'wallet', icon: '🏦', label: 'Wallet' }
-                        ].map(t => (
-                            <button key={t.id} onClick={() => setTab(t.id)} className={`flex flex-col items-center gap-0.5 transition-all ${tab === t.id ? 'text-[var(--accent)] scale-105' : 'text-slate-500 opacity-30'}`}>
-                                <span className="text-lg">{t.icon}</span>
-                                <span className="text-[6px] font-black uppercase italic">{t.label}</span>
-                            </button>
-                        ))}
-                    </nav>
-                </div>
-            );
-        };
-
-        const DevHub = ({ onExit, config }) => {
-            const [settings, setSettings] = useState({ ...config });
-            const save = async () => { await db.ref('config/app').update(settings); showToast("Redeployed", "⚙️"); };
-            return (
-                <div className="fixed inset-0 bg-[#080a11] p-5 z-[2000] overflow-y-auto no-scrollbar pb-10">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-sm font-black uppercase italic">Dev Core</h2>
-                        <button onClick={onExit} className="bg-white/5 w-7 h-7 rounded-full flex items-center justify-center text-xs">✕</button>
-                    </div>
-                    <div className="space-y-4">
-                        <div className="card p-4 space-y-2">
-                            <p className="text-[8px] font-black text-slate-600 uppercase">Auth</p>
-                            <input type="password" placeholder="Bot Token" className="input-field" value={settings.botToken || ''} onChange={e => setSettings({...settings, botToken: e.target.value})} />
-                            <input placeholder="Bot User (no @)" className="input-field" value={settings.botUsername || ''} onChange={e => setSettings({...settings, botUsername: e.target.value})} />
-                            <input placeholder="WebApp Name" className="input-field" value={settings.appShortName || ''} onChange={e => setSettings({...settings, appShortName: e.target.value})} />
-                            <input placeholder="Admin IDs (comma list)" className="input-field" value={settings.adminUid || ''} onChange={e => setSettings({...settings, adminUid: e.target.value})} />
-                        </div>
-                        <div className="card p-4 space-y-2">
-                            <p className="text-[8px] font-black text-slate-600 uppercase">Routes</p>
-                            <input placeholder="Submissions ID" className="input-field" value={settings.submissionChannelId || ''} onChange={e => setSettings({...settings, submissionChannelId: e.target.value})} />
-                            <input placeholder="Payouts ID" className="input-field" value={settings.withdrawalChannelId || ''} onChange={e => setSettings({...settings, withdrawalChannelId: e.target.value})} />
-                            <input placeholder="Public Proof Feed (no @)" className="input-field" value={settings.publicSubmissions || ''} onChange={e => setSettings({...settings, publicSubmissions: e.target.value})} />
-                            <input placeholder="Public Payout Feed (no @)" className="input-field" value={settings.publicPayouts || ''} onChange={e => setSettings({...settings, publicPayouts: e.target.value})} />
-                        </div>
-                        <button onClick={save} className="btn-primary h-11">UPDATE INFRASTRUCTURE</button>
-                    </div>
-                </div>
-            );
-        };
-
-        const AdminHub = ({ onExit, config, tasks }) => {
-            const [settings, setSettings] = useState({ ...config });
-            const [newTask, setNewTask] = useState({ icon: '🎯', title: '', reward: 100, description: '', link: '' });
-            const save = async () => { await db.ref('config/app').update(settings); showToast("Commited", "💾"); };
-            return (
-                <div className="fixed inset-0 bg-[#080a11] p-5 z-[1500] overflow-y-auto no-scrollbar pb-20">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-sm font-black uppercase italic">Admin Panel</h2>
-                        <button onClick={onExit} className="bg-white/5 w-7 h-7 rounded-full flex items-center justify-center text-xs">✕</button>
-                    </div>
-                    <div className="space-y-4">
-                        <div className="card p-4 space-y-2">
-                            <input placeholder="App Title" className="input-field" value={settings.appName || ''} onChange={e => setSettings({...settings, appName: e.target.value})} />
-                            <div className="grid grid-cols-2 gap-2">
-                                <input type="number" placeholder="Min Pay" className="input-field" value={settings.minWithdrawal || ''} onChange={e => setSettings({...settings, minWithdrawal: Number(e.target.value)})} />
-                                <input type="number" placeholder="Ref Pay" className="input-field" value={settings.referralReward || ''} onChange={e => setSettings({...settings, referralReward: Number(e.target.value)})} />
-                            </div>
-                            <input placeholder="Currency (₦)" className="input-field" value={settings.currency || ''} onChange={e => setSettings({...settings, currency: e.target.value})} />
-                        </div>
-                        <div className="card p-4 space-y-2">
-                            <p className="text-[8px] font-black uppercase">Mission Factory</p>
-                            <div className="grid grid-cols-4 gap-2">
-                                <input placeholder="Icon" className="input-field" value={newTask.icon} onChange={e => setNewTask({...newTask, icon: e.target.value})} />
-                                <input placeholder="Title" className="input-field col-span-3" value={newTask.title} onChange={e => setNewTask({...newTask, title: e.target.value})} />
-                            </div>
-                            <input type="number" placeholder="Reward" className="input-field" value={newTask.reward} onChange={e => setNewTask({...newTask, reward: Number(e.target.value)})} />
-                            <textarea placeholder="Description" className="input-field h-14" value={newTask.description} onChange={e => setNewTask({...newTask, description: e.target.value})} />
-                            <input placeholder="Task Link" className="input-field" value={newTask.link} onChange={e => setNewTask({...newTask, link: e.target.value})} />
-                            <button onClick={async () => { if(!newTask.title) return; const id = 't_' + Date.now(); await db.ref(`tasks/${id}`).set({ ...newTask, id }); setNewTask({ icon: '🎯', title: '', reward: 100, description: '', link: '' }); showToast("Deployed", "🚀"); }} className="btn-primary">ADD MISSION</button>
-                        </div>
-                        <div className="space-y-1.5">
-                            {tasks.map(t => (
-                                <div key={t.id} className="card p-2 flex justify-between items-center text-[9px] font-bold">
-                                    <span>{t.icon} {t.title}</span>
-                                    <button onClick={() => db.ref(`tasks/${t.id}`).remove()} className="text-red-500 uppercase text-[7px]">Delete</button>
-                                </div>
-                            ))}
-                        </div>
-                        <button onClick={save} className="btn-primary h-11">SAVE SETTINGS</button>
-                    </div>
-                </div>
-            );
-        };
-
-        const PinModal = ({ title, onConfirm, onCancel }) => {
-            const [pin, setPin] = useState('');
-            return (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[3000] flex items-center justify-center p-6">
-                    <div className="card w-full max-w-[240px] p-5 space-y-3">
-                        <div className="text-center">
-                            <h3 className="text-sm font-black uppercase italic">{title}</h3>
-                            <p className="text-[8px] text-slate-500 uppercase font-bold mt-1">Auth Required</p>
-                        </div>
-                        <input type="password" className="input-field text-center text-lg tracking-[0.8em] h-12" placeholder="****" maxLength={6} value={pin} autoFocus onChange={e => setPin(e.target.value)} />
-                        <div className="flex gap-2">
-                            <button onClick={onCancel} className="flex-1 py-2.5 bg-white/5 rounded-lg font-bold text-[9px] uppercase">Cancel</button>
-                            <button onClick={() => onConfirm(pin)} className="btn-primary flex-1">Enter</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
     
