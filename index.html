@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -198,7 +197,7 @@
                 const isApproved = data.status === 'approved';
                 const text = `📢 <b>TASK ${isApproved ? 'APPROVED ✅' : 'DECLINED ❌'}</b>\nUser: @${escapeHTML(data.username)}\nReward: ${isApproved ? data.reward : 0} ${escapeHTML(config.currency)}\nStatus: ${isApproved ? 'Successfully Credited' : 'Submission Rejected'}`;
                 response = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, { 
-                                                                                      method: 'POST', 
+                            method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
                     body: JSON.stringify({ chat_id: channelId, text, parse_mode: 'HTML' }) 
                 });
@@ -242,6 +241,7 @@
             const [proof, setProof] = useState('');
             const [loading, setLoading] = useState(false);
             const isPending = user?.pendingTasks?.[task.id];
+            const isCompleted = user?.completedTasks?.[task.id];
             
             const submit = async () => {
                 if (!proof) return showToast("Upload proof", "📷");
@@ -257,17 +257,24 @@
                 finally { setLoading(false); }
             };
 
+            const isDisabled = isPending || isCompleted;
+
             return (
-                <div className="card mb-2 overflow-hidden bg-white/[0.02]">
-                    <div onClick={() => !isPending && setExpanded(!expanded)} className={`p-2.5 flex items-center justify-between transition-colors ${isPending ? 'opacity-70 bg-white/5' : 'active:bg-white/5'}`}>
+                <div className={`card mb-2 overflow-hidden bg-white/[0.02] ${isCompleted ? 'opacity-60' : ''}`}>
+                    <div onClick={() => !isDisabled && setExpanded(!expanded)} className={`p-2.5 flex items-center justify-between transition-colors ${isDisabled ? 'bg-white/5' : 'active:bg-white/5'}`}>
                         <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-lg">{task.icon || '⭐'}</div>
+                            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-lg">
+                                {isCompleted ? '✅' : (task.icon || '⭐')}
+                            </div>
                             <div>
                                 <h4 className="font-bold text-[10px] tracking-tight">{task.title}</h4>
                                 <span className="text-[var(--accent)] font-bold text-[9px]">+{task.reward} {currency}</span>
                             </div>
                         </div>
-                        {isPending ? (
+                        
+                        {isCompleted ? (
+                            <div className="text-[7px] font-black uppercase text-[var(--accent)] bg-[var(--accent)]/10 px-1.5 py-0.5 rounded italic">Completed</div>
+                        ) : isPending ? (
                             <div className="flex flex-col items-end gap-1">
                                 <div className="text-[7px] font-black uppercase text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded">Under Review</div>
                                 {config.submissionChannelUrl && (
@@ -278,7 +285,7 @@
                             <span className={`text-[9px] opacity-20 transition-transform ${expanded ? 'rotate-180' : ''}`}>▼</span>
                         )}
                     </div>
-                    {expanded && !isPending && (
+                    {expanded && !isDisabled && (
                         <div className="px-2.5 pb-2.5 space-y-2 animate-slide">
                             <p className="compact-text text-slate-400">{task.description}</p>
                             {task.link && <button onClick={() => window.open(task.link, '_blank')} className="w-full py-1.5 bg-white/5 rounded-lg text-[9px] font-black border border-white/10 uppercase tracking-wider">Perform Task</button>}
@@ -329,7 +336,7 @@
                 const action = parts[0]; 
                 const targetUid = parts[1];
                 const value = parts[2];
-                const extra = parts[3];
+                const extra = parts[3]; // Task ID
                 const msgId = parts[4];
 
                 setProcessing(`Processing ${action.toUpperCase()}...`);
@@ -340,11 +347,14 @@
                     const targetUser = snap.val();
 
                     if(action === 'apr') {
+                        // APPROVAL: Increment points, mark as completed, remove from pending
                         await db.ref(`users/${targetUid}/points`).transaction(p => (p || 0) + Number(value));
+                        await db.ref(`users/${targetUid}/completedTasks/${extra}`).set(true);
                         await db.ref(`users/${targetUid}/pendingTasks/${extra}`).remove();
                         await sendToTelegram('task_status', { username: targetUser.username, status: 'approved', reward: value }, currentConfig);
                         showToast("Task Approved!", "✅");
                     } else if(action === 'dec') {
+                        // DECLINE: Just remove from pending so user can resubmit
                         await db.ref(`users/${targetUid}/pendingTasks/${extra}`).remove();
                         await sendToTelegram('task_status', { username: targetUser.username, status: 'declined' }, currentConfig);
                         showToast("Task Declined", "❌");
@@ -387,7 +397,7 @@
                         } else { showToast("Admin Access Only", "🔒"); }
                     }
 
-                    db.ref(`users/${uid}`).on('value', us => {
+                        db.ref(`users/${uid}`).on('value', us => {
                         if(us.exists()) { 
                             const u = us.val();
                             setUser(u); setGate(false); setJoinGate(!u.joined);
@@ -398,7 +408,7 @@
 
                 db.ref('tasks').on('value', s => setTasks(s.exists() ? Object.values(s.val()) : []));
                 return () => db.ref().off();
-                }, []);
+            }, []);
 
             const verifyPin = (pin) => {
                 if (showPinModal === 'admin') {
@@ -547,6 +557,7 @@
                             </div>
                         )}
                     </main>
+
                     <nav className="fixed bottom-4 left-4 right-4 h-14 nav-pill rounded-[20px] flex items-center justify-around z-50 border border-white/5 shadow-2xl">
                         {[
                             { id: 'home', icon: '🏠', label: 'Home' },
@@ -586,7 +597,7 @@
                             <input placeholder="Task Submission Channel ID" className="input-field" value={settings.submissionChannelId || ''} onChange={e => setSettings({...settings, submissionChannelId: e.target.value})} />
                             <input placeholder="Withdrawal Channel ID" className="input-field" value={settings.withdrawalChannelId || ''} onChange={e => setSettings({...settings, withdrawalChannelId: e.target.value})} />
                         </div>
-                        <div className="card p-4 space-y-2">
+                            <div className="card p-4 space-y-2">
                             <p className="text-[8px] font-black text-slate-600 uppercase">Public Channel Links (For User View)</p>
                             <input placeholder="Task Submission Channel URL" className="input-field" value={settings.submissionChannelUrl || ''} onChange={e => setSettings({...settings, submissionChannelUrl: e.target.value})} />
                             <input placeholder="Withdrawal Channel URL" className="input-field" value={settings.withdrawalChannelUrl || ''} onChange={e => setSettings({...settings, withdrawalChannelUrl: e.target.value})} />
@@ -687,5 +698,4 @@
     </script>
 </body>
 </html>
-    
     
